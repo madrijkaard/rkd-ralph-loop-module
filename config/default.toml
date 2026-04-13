@@ -1,0 +1,1 @@
+database_url = "postgres://admin:admin123@localhost:5432/ralph_loop_module"
