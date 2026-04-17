@@ -14,7 +14,10 @@ pub async fn get_tasks(
 ) -> Result<Json<Vec<Task>>, StatusCode> {
     let tasks = repo::find_all(&pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            println!("DB ERROR (get_tasks): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(tasks))
 }
@@ -25,7 +28,10 @@ pub async fn get_task(
 ) -> Result<Json<Task>, StatusCode> {
     repo::find_by_id(&pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            println!("DB ERROR (get_task): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
 }
@@ -44,7 +50,10 @@ pub async fn create_task(
         payload.use_case_id,
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        println!("DB ERROR (create_task): {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok((StatusCode::CREATED, Json(task)))
 }
@@ -65,7 +74,10 @@ pub async fn update_task(
         payload.use_case_id,
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .map_err(|e| {
+        println!("DB ERROR (update_task): {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .map(Json)
     .ok_or(StatusCode::NOT_FOUND)
 }
@@ -76,7 +88,10 @@ pub async fn delete_task(
 ) -> Result<Json<DeleteResponse>, StatusCode> {
     let deleted = repo::delete(&pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            println!("DB ERROR (delete_task): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if deleted {
         Ok(Json(DeleteResponse { deleted: true }))

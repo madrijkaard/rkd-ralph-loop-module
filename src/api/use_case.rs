@@ -14,7 +14,10 @@ pub async fn get_use_cases(
 ) -> Result<Json<Vec<UseCase>>, StatusCode> {
     let use_cases = repo::find_all(&pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            println!("DB ERROR (get_use_cases): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(use_cases))
 }
@@ -25,7 +28,10 @@ pub async fn get_use_case(
 ) -> Result<Json<UseCase>, StatusCode> {
     repo::find_by_id(&pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            println!("DB ERROR (get_use_case): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
 }
@@ -41,7 +47,10 @@ pub async fn create_use_case(
         payload.project_id,
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        println!("DB ERROR (create_use_case): {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok((StatusCode::CREATED, Json(use_case)))
 }
@@ -59,7 +68,10 @@ pub async fn update_use_case(
         payload.project_id,
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .map_err(|e| {
+        println!("DB ERROR (update_use_case): {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .map(Json)
     .ok_or(StatusCode::NOT_FOUND)
 }
@@ -70,7 +82,10 @@ pub async fn delete_use_case(
 ) -> Result<Json<DeleteResponse>, StatusCode> {
     let deleted = repo::delete(&pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            println!("DB ERROR (delete_use_case): {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if deleted {
         Ok(Json(DeleteResponse { deleted: true }))
