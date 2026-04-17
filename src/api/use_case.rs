@@ -5,17 +5,18 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, UseCasePayload};
+use crate::dto::{DeleteResponse, UseCasePayload, UseCaseCreateResponse};
 use crate::model::UseCase;
 use crate::repository::use_case as repo;
 
-pub async fn get_use_cases(
+pub async fn get_use_cases_by_project(
     State(pool): State<PgPool>,
+    Path(project_id): Path<i32>,
 ) -> Result<Json<Vec<UseCase>>, StatusCode> {
-    let use_cases = repo::find_all(&pool)
+    let use_cases = repo::find_all_by_project_id(&pool, project_id)
         .await
         .map_err(|e| {
-            println!("DB ERROR (get_use_cases): {:?}", e);
+            println!("DB ERROR (get_use_cases_by_project): {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -39,7 +40,7 @@ pub async fn get_use_case(
 pub async fn create_use_case(
     State(pool): State<PgPool>,
     Json(payload): Json<UseCasePayload>,
-) -> Result<(StatusCode, Json<UseCase>), StatusCode> {
+) -> Result<(StatusCode, Json<UseCaseCreateResponse>), StatusCode> {
     let use_case = repo::insert(
         &pool,
         payload.name,

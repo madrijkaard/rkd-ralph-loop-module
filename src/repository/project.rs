@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use chrono::Utc;
 use crate::model::Project;
+use crate::dto::ProjectCreateResponse;
 use crate::enumerator::Status;
 
 pub async fn find_all(pool: &PgPool) -> Result<Vec<Project>, sqlx::Error> {
@@ -18,12 +19,12 @@ pub async fn find_by_id(pool: &PgPool, id: i32) -> Result<Option<Project>, sqlx:
         .await
 }
 
-pub async fn insert(pool: &PgPool, name: String) -> Result<Project, sqlx::Error> {
+pub async fn insert(pool: &PgPool, name: String) -> Result<ProjectCreateResponse, sqlx::Error> {
     let now = Utc::now().naive_utc();
-    sqlx::query_as::<_, Project>(
+    sqlx::query_as::<_, ProjectCreateResponse>(
         "INSERT INTO project (name, created_date, last_modified_date, status)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, name, created_date, last_modified_date",
+         RETURNING id, name, created_date",
     )
     .bind(name)
     .bind(now)

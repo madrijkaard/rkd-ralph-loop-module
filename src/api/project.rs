@@ -5,7 +5,7 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, ProjectPayload};
+use crate::dto::{DeleteResponse, ProjectPayload, ProjectCreateResponse};
 use crate::model::Project;
 use crate::repository::project as repo;
 
@@ -39,7 +39,7 @@ pub async fn get_project(
 pub async fn create_project(
     State(pool): State<PgPool>,
     Json(payload): Json<ProjectPayload>,
-) -> Result<(StatusCode, Json<Project>), StatusCode> {
+) -> Result<(StatusCode, Json<ProjectCreateResponse>), StatusCode> {
     let project = repo::insert(&pool, payload.name)
         .await
         .map_err(|e| {

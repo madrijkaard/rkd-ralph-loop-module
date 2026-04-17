@@ -5,17 +5,18 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, TaskPayload};
+use crate::dto::{DeleteResponse, TaskPayload, TaskCreateResponse};
 use crate::model::Task;
 use crate::repository::task as repo;
 
-pub async fn get_tasks(
+pub async fn get_tasks_by_use_case(
     State(pool): State<PgPool>,
+    Path(use_case_id): Path<i32>,
 ) -> Result<Json<Vec<Task>>, StatusCode> {
-    let tasks = repo::find_all(&pool)
+    let tasks = repo::find_all_by_use_case_id(&pool, use_case_id)
         .await
         .map_err(|e| {
-            println!("DB ERROR (get_tasks): {:?}", e);
+            println!("DB ERROR (get_tasks_by_use_case): {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -39,7 +40,7 @@ pub async fn get_task(
 pub async fn create_task(
     State(pool): State<PgPool>,
     Json(payload): Json<TaskPayload>,
-) -> Result<(StatusCode, Json<Task>), StatusCode> {
+) -> Result<(StatusCode, Json<TaskCreateResponse>), StatusCode> {
     let task = repo::insert(
         &pool,
         payload.name,

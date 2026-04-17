@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use chrono::NaiveDateTime;
 
 #[derive(Deserialize)]
 pub struct ProjectPayload {
@@ -30,4 +31,39 @@ pub struct IterationPayload {
 #[derive(Serialize)]
 pub struct DeleteResponse {
     pub deleted: bool,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct ProjectCreateResponse {
+    pub id: i32,
+    pub name: String,
+    pub created_date: NaiveDateTime,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct UseCaseCreateResponse {
+    pub id: i32,
+    pub name: String,
+    pub prompt: String,
+    pub created_date: NaiveDateTime,
+    pub project_id: i32,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct TaskCreateResponse {
+    pub id: i32,
+    pub name: String,
+    pub sequence: i32,
+    pub r#type: String,
+    pub path: String,
+    pub prompt: String,
+    pub created_date: NaiveDateTime,
+    pub use_case_id: i32,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct IterationCreateResponse {
+    pub id: i32,
+    pub created_date: NaiveDateTime,
+    pub task_id: i32,
 }

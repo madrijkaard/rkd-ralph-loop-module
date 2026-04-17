@@ -5,17 +5,18 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, IterationPayload};
+use crate::dto::{DeleteResponse, IterationPayload, IterationCreateResponse};
 use crate::model::Iteration;
 use crate::repository::iteration as repo;
 
-pub async fn get_iterations(
+pub async fn get_iterations_by_task(
     State(pool): State<PgPool>,
+    Path(task_id): Path<i32>,
 ) -> Result<Json<Vec<Iteration>>, StatusCode> {
-    let iterations = repo::find_all(&pool)
+    let iterations = repo::find_all_by_task_id(&pool, task_id)
         .await
         .map_err(|e| {
-            println!("DB ERROR (get_iterations): {:?}", e);
+            println!("DB ERROR (get_iterations_by_task): {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -39,7 +40,7 @@ pub async fn get_iteration(
 pub async fn create_iteration(
     State(pool): State<PgPool>,
     Json(payload): Json<IterationPayload>,
-) -> Result<(StatusCode, Json<Iteration>), StatusCode> {
+) -> Result<(StatusCode, Json<IterationCreateResponse>), StatusCode> {
     let iteration = repo::insert(&pool, payload.task_id)
         .await
         .map_err(|e| {

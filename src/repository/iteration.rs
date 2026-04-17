@@ -1,29 +1,40 @@
 use sqlx::PgPool;
 use chrono::Utc;
 use crate::model::Iteration;
+use crate::dto::IterationCreateResponse;
 use crate::enumerator::Status;
 
-pub async fn find_all(pool: &PgPool) -> Result<Vec<Iteration>, sqlx::Error> {
-    sqlx::query_as::<_, Iteration>("SELECT id, created_date, last_modified_date, task_id FROM iteration WHERE status = $1 ORDER BY id")
-        .bind(Status::A)
-        .fetch_all(pool)
-        .await
+pub async fn find_all_by_task_id(pool: &PgPool, task_id: i32) -> Result<Vec<Iteration>, sqlx::Error> {
+    sqlx::query_as::<_, Iteration>(
+        "SELECT id, created_date, last_modified_date, task_id
+         FROM iteration
+         WHERE task_id = $1 AND status = $2
+         ORDER BY id",
+    )
+    .bind(task_id)
+    .bind(Status::A)
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn find_by_id(pool: &PgPool, id: i32) -> Result<Option<Iteration>, sqlx::Error> {
-    sqlx::query_as::<_, Iteration>("SELECT id, created_date, last_modified_date, task_id FROM iteration WHERE id = $1 AND status = $2")
-        .bind(id)
-        .bind(Status::A)
-        .fetch_optional(pool)
-        .await
+    sqlx::query_as::<_, Iteration>(
+        "SELECT id, created_date, last_modified_date, task_id
+         FROM iteration
+         WHERE id = $1 AND status = $2",
+    )
+    .bind(id)
+    .bind(Status::A)
+    .fetch_optional(pool)
+    .await
 }
 
-pub async fn insert(pool: &PgPool, task_id: i32) -> Result<Iteration, sqlx::Error> {
+pub async fn insert(pool: &PgPool, task_id: i32) -> Result<IterationCreateResponse, sqlx::Error> {
     let now = Utc::now().naive_utc();
-    sqlx::query_as::<_, Iteration>(
+    sqlx::query_as::<_, IterationCreateResponse>(
         "INSERT INTO iteration (created_date, last_modified_date, status, task_id)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, created_date, last_modified_date, task_id",
+         RETURNING id, created_date, task_id",
     )
     .bind(now)
     .bind(now)

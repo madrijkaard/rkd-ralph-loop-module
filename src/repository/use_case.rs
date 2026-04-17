@@ -1,21 +1,32 @@
 use sqlx::PgPool;
 use chrono::Utc;
 use crate::model::UseCase;
+use crate::dto::UseCaseCreateResponse;
 use crate::enumerator::Status;
 
-pub async fn find_all(pool: &PgPool) -> Result<Vec<UseCase>, sqlx::Error> {
-    sqlx::query_as::<_, UseCase>("SELECT id, name, prompt, created_date, last_modified_date, project_id FROM use_case WHERE status = $1 ORDER BY id")
-        .bind(Status::A)
-        .fetch_all(pool)
-        .await
+pub async fn find_all_by_project_id(pool: &PgPool, project_id: i32) -> Result<Vec<UseCase>, sqlx::Error> {
+    sqlx::query_as::<_, UseCase>(
+        "SELECT id, name, prompt, created_date, last_modified_date, project_id
+         FROM use_case
+         WHERE project_id = $1 AND status = $2
+         ORDER BY id",
+    )
+    .bind(project_id)
+    .bind(Status::A)
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn find_by_id(pool: &PgPool, id: i32) -> Result<Option<UseCase>, sqlx::Error> {
-    sqlx::query_as::<_, UseCase>("SELECT id, name, prompt, created_date, last_modified_date, project_id FROM use_case WHERE id = $1 AND status = $2")
-        .bind(id)
-        .bind(Status::A)
-        .fetch_optional(pool)
-        .await
+    sqlx::query_as::<_, UseCase>(
+        "SELECT id, name, prompt, created_date, last_modified_date, project_id
+         FROM use_case
+         WHERE id = $1 AND status = $2",
+    )
+    .bind(id)
+    .bind(Status::A)
+    .fetch_optional(pool)
+    .await
 }
 
 pub async fn insert(
@@ -23,12 +34,12 @@ pub async fn insert(
     name: String,
     prompt: String,
     project_id: i32,
-) -> Result<UseCase, sqlx::Error> {
+) -> Result<UseCaseCreateResponse, sqlx::Error> {
     let now = Utc::now().naive_utc();
-    sqlx::query_as::<_, UseCase>(
+    sqlx::query_as::<_, UseCaseCreateResponse>(
         "INSERT INTO use_case (name, prompt, created_date, last_modified_date, status, project_id)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, name, prompt, created_date, last_modified_date, project_id",
+         RETURNING id, name, prompt, created_date, project_id",
     )
     .bind(name)
     .bind(prompt)
