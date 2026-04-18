@@ -44,7 +44,6 @@ pub async fn create_task(
     let task = repo::insert(
         &pool,
         payload.name,
-        payload.sequence,
         payload.r#type,
         payload.path,
         payload.prompt,
@@ -68,7 +67,6 @@ pub async fn update_task(
         &pool,
         id,
         payload.name,
-        payload.sequence,
         payload.r#type,
         payload.path,
         payload.prompt,

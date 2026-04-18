@@ -16,7 +16,6 @@ pub struct UseCasePayload {
 #[derive(Deserialize)]
 pub struct TaskPayload {
     pub name: String,
-    pub sequence: i32,
     pub r#type: String,
     pub path: String,
     pub prompt: String,
