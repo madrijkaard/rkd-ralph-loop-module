@@ -5,9 +5,10 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, ProjectPayload, ProjectCreateResponse};
+use crate::dto::{DeleteResponse, ProjectPayload, ProjectCreateResponse, ErrorResponse};
 use crate::model::Project;
 use crate::repository::project as repo;
+use crate::repository::use_case; // 🔥 novo
 
 pub async fn get_projects(
     State(pool): State<PgPool>,
@@ -68,17 +69,56 @@ pub async fn update_project(
 pub async fn delete_project(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
-) -> Result<Json<DeleteResponse>, StatusCode> {
+) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
+
+    // 🔍 Verifica se existem use cases associados
+    let has_use_cases = use_case::exists_by_project_id(&pool, id)
+        .await
+        .map_err(|e| {
+            println!("DB ERROR (check_use_cases): {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
+        })?;
+
+    // 🚫 Bloqueia deleção
+    if has_use_cases {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Não foi possível excluir o projeto, existe caso de uso associado.".into(),
+            }),
+        ));
+    }
+
+    // 🗑 Deleção normal
     let deleted = repo::delete(&pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_project): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
         })?;
 
     if deleted {
         Ok(Json(DeleteResponse { deleted: true }))
     } else {
-        Err(StatusCode::NOT_FOUND)
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0002".into(),
+                message: "Projeto não encontrado.".into(),
+            }),
+        ))
     }
 }

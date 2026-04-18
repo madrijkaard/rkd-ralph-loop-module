@@ -112,3 +112,22 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
 
     Ok(result.rows_affected() > 0)
 }
+
+/// 🔍 Verifica se existe alguma task ativa para um use_case
+pub async fn exists_by_use_case_id(
+    pool: &PgPool,
+    use_case_id: i32,
+) -> Result<bool, sqlx::Error> {
+    let exists: Option<i32> = sqlx::query_scalar(
+        "SELECT 1
+         FROM task
+         WHERE use_case_id = $1 AND status = $2
+         LIMIT 1"
+    )
+    .bind(use_case_id)
+    .bind(Status::A)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(exists.is_some())
+}

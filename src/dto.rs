@@ -32,6 +32,13 @@ pub struct DeleteResponse {
     pub deleted: bool,
 }
 
+/// ✅ Resposta padronizada de erro (nova)
+#[derive(Serialize)]
+pub struct ErrorResponse {
+    pub code: String,
+    pub message: String,
+}
+
 #[derive(Serialize, sqlx::FromRow)]
 pub struct ProjectCreateResponse {
     pub id: i32,

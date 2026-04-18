@@ -5,9 +5,10 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, TaskPayload, TaskCreateResponse};
+use crate::dto::{DeleteResponse, TaskPayload, TaskCreateResponse, ErrorResponse};
 use crate::model::Task;
 use crate::repository::task as repo;
+use crate::repository::iteration; // 🔥 novo
 
 pub async fn get_tasks_by_use_case(
     State(pool): State<PgPool>,
@@ -84,17 +85,56 @@ pub async fn update_task(
 pub async fn delete_task(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
-) -> Result<Json<DeleteResponse>, StatusCode> {
+) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
+
+    // 🔍 Verifica se existem iterations associadas
+    let has_iterations = iteration::exists_by_task_id(&pool, id)
+        .await
+        .map_err(|e| {
+            println!("DB ERROR (check_iterations): {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
+        })?;
+
+    // 🚫 Bloqueia deleção
+    if has_iterations {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Não foi possível excluir a tarefa, existe iteração associada.".into(),
+            }),
+        ));
+    }
+
+    // 🗑 Deleção normal
     let deleted = repo::delete(&pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_task): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
         })?;
 
     if deleted {
         Ok(Json(DeleteResponse { deleted: true }))
     } else {
-        Err(StatusCode::NOT_FOUND)
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0002".into(),
+                message: "Tarefa não encontrada.".into(),
+            }),
+        ))
     }
 }

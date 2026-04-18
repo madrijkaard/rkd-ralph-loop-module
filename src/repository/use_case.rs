@@ -85,5 +85,25 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     .bind(Status::A)
     .execute(pool)
     .await?;
+
     Ok(result.rows_affected() > 0)
+}
+
+/// 🔍 Verifica se existe algum use_case ativo para um project
+pub async fn exists_by_project_id(
+    pool: &PgPool,
+    project_id: i32,
+) -> Result<bool, sqlx::Error> {
+    let exists: Option<i32> = sqlx::query_scalar(
+        "SELECT 1
+         FROM use_case
+         WHERE project_id = $1 AND status = $2
+         LIMIT 1"
+    )
+    .bind(project_id)
+    .bind(Status::A)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(exists.is_some())
 }

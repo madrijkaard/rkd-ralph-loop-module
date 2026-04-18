@@ -5,9 +5,10 @@ use axum::{
 };
 use sqlx::PgPool;
 
-use crate::dto::{DeleteResponse, UseCasePayload, UseCaseCreateResponse};
+use crate::dto::{DeleteResponse, UseCasePayload, UseCaseCreateResponse, ErrorResponse};
 use crate::model::UseCase;
 use crate::repository::use_case as repo;
+use crate::repository::task; // 🔥 novo
 
 pub async fn get_use_cases_by_project(
     State(pool): State<PgPool>,
@@ -80,17 +81,56 @@ pub async fn update_use_case(
 pub async fn delete_use_case(
     State(pool): State<PgPool>,
     Path(id): Path<i32>,
-) -> Result<Json<DeleteResponse>, StatusCode> {
+) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
+
+    // 🔍 Verifica se existem tasks associadas
+    let has_tasks = task::exists_by_use_case_id(&pool, id)
+        .await
+        .map_err(|e| {
+            println!("DB ERROR (check_tasks): {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
+        })?;
+
+    // 🚫 Bloqueia deleção
+    if has_tasks {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Não foi possível excluir o caso de uso, existe tarefa associada.".into(),
+            }),
+        ));
+    }
+
+    // 🗑 Deleção normal
     let deleted = repo::delete(&pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_use_case): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Erro interno.".into(),
+                }),
+            )
         })?;
 
     if deleted {
         Ok(Json(DeleteResponse { deleted: true }))
     } else {
-        Err(StatusCode::NOT_FOUND)
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0002".into(),
+                message: "Caso de uso não encontrado.".into(),
+            }),
+        ))
     }
 }

@@ -31,6 +31,7 @@ pub async fn find_by_id(pool: &PgPool, id: i32) -> Result<Option<Iteration>, sql
 
 pub async fn insert(pool: &PgPool, task_id: i32) -> Result<IterationCreateResponse, sqlx::Error> {
     let now = Utc::now().naive_utc();
+
     sqlx::query_as::<_, IterationCreateResponse>(
         "INSERT INTO iteration (created_date, last_modified_date, status, task_id)
          VALUES ($1, $2, $3, $4)
@@ -46,6 +47,7 @@ pub async fn insert(pool: &PgPool, task_id: i32) -> Result<IterationCreateRespon
 
 pub async fn update(pool: &PgPool, id: i32, task_id: i32) -> Result<Option<Iteration>, sqlx::Error> {
     let now = Utc::now().naive_utc();
+
     sqlx::query_as::<_, Iteration>(
         "UPDATE iteration SET last_modified_date = $1, task_id = $2
          WHERE id = $3 AND status = $4
@@ -61,6 +63,7 @@ pub async fn update(pool: &PgPool, id: i32, task_id: i32) -> Result<Option<Itera
 
 pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     let now = Utc::now().naive_utc();
+
     let result = sqlx::query(
         "UPDATE iteration SET status = $1, last_modified_date = $2 WHERE id = $3 AND status = $4",
     )
@@ -70,5 +73,25 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     .bind(Status::A)
     .execute(pool)
     .await?;
+
     Ok(result.rows_affected() > 0)
+}
+
+/// 🔍 Verifica se existe alguma iteration ativa para uma task
+pub async fn exists_by_task_id(
+    pool: &PgPool,
+    task_id: i32,
+) -> Result<bool, sqlx::Error> {
+    let exists: Option<i32> = sqlx::query_scalar(
+        "SELECT 1
+         FROM iteration
+         WHERE task_id = $1 AND status = $2
+         LIMIT 1"
+    )
+    .bind(task_id)
+    .bind(Status::A)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(exists.is_some())
 }
