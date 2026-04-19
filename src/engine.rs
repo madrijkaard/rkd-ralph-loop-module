@@ -43,7 +43,7 @@ struct ResponseMessage {
 
 //
 // ==========================
-// RESPONSE STRUCTS (MODELS) 🔥
+// RESPONSE STRUCTS (MODELS)
 // ==========================
 //
 
@@ -71,7 +71,7 @@ pub struct EngineClient {
 impl EngineClient {
     pub fn new(base_url: String) -> Self {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(60))
+            .timeout(Duration::from_secs(120))
             .build()
             .expect("Failed to build HTTP client");
 
@@ -79,10 +79,8 @@ impl EngineClient {
     }
 
     /// ==========================
-    /// CHAT COMPLETIONS
+    /// CHAT COMPLETIONS (FIXED)
     /// ==========================
-    ///
-    /// Retorna apenas o campo `content`
     pub async fn generate(
         &self,
         system_content: String,
@@ -122,7 +120,8 @@ impl EngineClient {
             .await
             .map_err(EngineError::Parse)?;
 
-        let content = body
+        // 1. pega resposta bruta do LLM
+        let raw_content = body
             .choices
             .get(0)
             .ok_or(EngineError::EmptyResponse)?
@@ -130,14 +129,15 @@ impl EngineClient {
             .content
             .clone();
 
-        Ok(content)
+        // 2. REMOVE TOTALMENTE DEPENDÊNCIA DE JSON
+        let code = extract_code_safely(&raw_content);
+
+        Ok(code)
     }
 
     /// ==========================
-    /// LIST MODELS 🔥
+    /// LIST MODELS
     /// ==========================
-    ///
-    /// Retorna apenas os IDs dos modelos
     pub async fn list_models(&self) -> Result<Vec<String>, EngineError> {
 
         let url = format!("{}/v1/models", self.base_url);
@@ -156,14 +156,28 @@ impl EngineClient {
             .await
             .map_err(EngineError::Parse)?;
 
-        let models = body
-            .data
-            .into_iter()
-            .map(|m| m.id)
-            .collect();
-
-        Ok(models)
+        Ok(body.data.into_iter().map(|m| m.id).collect())
     }
+}
+
+//
+// ==========================
+// SAFE EXTRACTION (CORE FIX)
+// ==========================
+//
+
+fn extract_code_safely(content: &str) -> String {
+    let trimmed = content.trim();
+
+    // 🔥 Caso 1: veio JSON válido
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if let Some(code) = value.get("code").and_then(|v| v.as_str()) {
+            return code.to_string();
+        }
+    }
+
+    // 🔥 Caso 2: fallback direto (modelo já retornou código puro)
+    trimmed.to_string()
 }
 
 //

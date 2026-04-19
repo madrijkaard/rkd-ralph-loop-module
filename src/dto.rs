@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 
+//
+// ==========================
+// PAYLOADS (REQUESTS)
+// ==========================
+//
+
 #[derive(Deserialize)]
 pub struct ProjectPayload {
     pub name: String,
