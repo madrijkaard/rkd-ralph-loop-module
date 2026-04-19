@@ -1,1 +1,9 @@
+# =========================
+# DATABASE
+# =========================
 database_url = "postgres://admin:admin123@localhost:5432/ralph_loop_module"
+
+# =========================
+# ENGINE (LLM CLIENT)
+# =========================
+engine_base_url = "http://127.0.0.1:1234"

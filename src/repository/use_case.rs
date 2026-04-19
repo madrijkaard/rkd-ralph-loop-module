@@ -89,7 +89,6 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
-/// 🔍 Verifica se existe algum use_case ativo para um project
 pub async fn exists_by_project_id(
     pool: &PgPool,
     project_id: i32,

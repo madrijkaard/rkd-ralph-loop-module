@@ -3,17 +3,20 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::PgPool;
 
+use crate::api::AppState;
 use crate::dto::{DeleteResponse, ProjectPayload, ProjectCreateResponse, ErrorResponse};
 use crate::model::Project;
 use crate::repository::project as repo;
-use crate::repository::use_case; // 🔥 novo
+use crate::repository::use_case;
 
 pub async fn get_projects(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<Project>>, StatusCode> {
-    let projects = repo::find_all(&pool)
+
+    let pool = &state.pool;
+
+    let projects = repo::find_all(pool)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_projects): {:?}", e);
@@ -24,10 +27,13 @@ pub async fn get_projects(
 }
 
 pub async fn get_project(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<Project>, StatusCode> {
-    repo::find_by_id(&pool, id)
+
+    let pool = &state.pool;
+
+    repo::find_by_id(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_project): {:?}", e);
@@ -38,10 +44,13 @@ pub async fn get_project(
 }
 
 pub async fn create_project(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<ProjectPayload>,
 ) -> Result<(StatusCode, Json<ProjectCreateResponse>), StatusCode> {
-    let project = repo::insert(&pool, payload.name)
+
+    let pool = &state.pool;
+
+    let project = repo::insert(pool, payload.name)
         .await
         .map_err(|e| {
             println!("DB ERROR (create_project): {:?}", e);
@@ -52,11 +61,14 @@ pub async fn create_project(
 }
 
 pub async fn update_project(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<ProjectPayload>,
 ) -> Result<Json<Project>, StatusCode> {
-    repo::update(&pool, id, payload.name)
+
+    let pool = &state.pool;
+
+    repo::update(pool, id, payload.name)
         .await
         .map_err(|e| {
             println!("DB ERROR (update_project): {:?}", e);
@@ -67,12 +79,13 @@ pub async fn update_project(
 }
 
 pub async fn delete_project(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
 
-    // 🔍 Verifica se existem use cases associados
-    let has_use_cases = use_case::exists_by_project_id(&pool, id)
+    let pool = &state.pool;
+
+    let has_use_cases = use_case::exists_by_project_id(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (check_use_cases): {:?}", e);
@@ -85,7 +98,6 @@ pub async fn delete_project(
             )
         })?;
 
-    // 🚫 Bloqueia deleção
     if has_use_cases {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -96,8 +108,7 @@ pub async fn delete_project(
         ));
     }
 
-    // 🗑 Deleção normal
-    let deleted = repo::delete(&pool, id)
+    let deleted = repo::delete(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_project): {:?}", e);

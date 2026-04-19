@@ -3,17 +3,20 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::PgPool;
 
+use crate::api::AppState;
 use crate::dto::{DeleteResponse, IterationPayload, IterationCreateResponse};
 use crate::model::Iteration;
 use crate::repository::iteration as repo;
 
 pub async fn get_iterations_by_task(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(task_id): Path<i32>,
 ) -> Result<Json<Vec<Iteration>>, StatusCode> {
-    let iterations = repo::find_all_by_task_id(&pool, task_id)
+
+    let pool = &state.pool;
+
+    let iterations = repo::find_all_by_task_id(pool, task_id)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_iterations_by_task): {:?}", e);
@@ -24,10 +27,13 @@ pub async fn get_iterations_by_task(
 }
 
 pub async fn get_iteration(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<Iteration>, StatusCode> {
-    repo::find_by_id(&pool, id)
+
+    let pool = &state.pool;
+
+    repo::find_by_id(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_iteration): {:?}", e);
@@ -38,10 +44,13 @@ pub async fn get_iteration(
 }
 
 pub async fn create_iteration(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<IterationPayload>,
 ) -> Result<(StatusCode, Json<IterationCreateResponse>), StatusCode> {
-    let iteration = repo::insert(&pool, payload.task_id)
+
+    let pool = &state.pool;
+
+    let iteration = repo::insert(pool, payload.task_id)
         .await
         .map_err(|e| {
             println!("DB ERROR (create_iteration): {:?}", e);
@@ -52,11 +61,14 @@ pub async fn create_iteration(
 }
 
 pub async fn update_iteration(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<IterationPayload>,
 ) -> Result<Json<Iteration>, StatusCode> {
-    repo::update(&pool, id, payload.task_id)
+
+    let pool = &state.pool;
+
+    repo::update(pool, id, payload.task_id)
         .await
         .map_err(|e| {
             println!("DB ERROR (update_iteration): {:?}", e);
@@ -67,10 +79,13 @@ pub async fn update_iteration(
 }
 
 pub async fn delete_iteration(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<DeleteResponse>, StatusCode> {
-    let deleted = repo::delete(&pool, id)
+
+    let pool = &state.pool;
+
+    let deleted = repo::delete(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_iteration): {:?}", e);

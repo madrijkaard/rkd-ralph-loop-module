@@ -27,17 +27,41 @@ pub struct IterationPayload {
     pub task_id: i32,
 }
 
+//
+// ==========================
+// EXECUTE TASK 🔥
+// ==========================
+//
+
+#[derive(Deserialize)]
+pub struct ExecuteTaskPayload {
+    pub system_content: String,
+    pub user_content: String,
+    pub model: String,
+}
+
+//
+// ==========================
+// GENERIC RESPONSES
+// ==========================
+//
+
 #[derive(Serialize)]
 pub struct DeleteResponse {
     pub deleted: bool,
 }
 
-/// ✅ Resposta padronizada de erro (nova)
 #[derive(Serialize)]
 pub struct ErrorResponse {
     pub code: String,
     pub message: String,
 }
+
+//
+// ==========================
+// CREATE RESPONSES
+// ==========================
+//
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct ProjectCreateResponse {

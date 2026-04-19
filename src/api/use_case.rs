@@ -3,18 +3,21 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use sqlx::PgPool;
 
+use crate::api::AppState;
 use crate::dto::{DeleteResponse, UseCasePayload, UseCaseCreateResponse, ErrorResponse};
 use crate::model::UseCase;
 use crate::repository::use_case as repo;
-use crate::repository::task; // 🔥 novo
+use crate::repository::task;
 
 pub async fn get_use_cases_by_project(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(project_id): Path<i32>,
 ) -> Result<Json<Vec<UseCase>>, StatusCode> {
-    let use_cases = repo::find_all_by_project_id(&pool, project_id)
+
+    let pool = &state.pool;
+
+    let use_cases = repo::find_all_by_project_id(pool, project_id)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_use_cases_by_project): {:?}", e);
@@ -25,10 +28,13 @@ pub async fn get_use_cases_by_project(
 }
 
 pub async fn get_use_case(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<UseCase>, StatusCode> {
-    repo::find_by_id(&pool, id)
+
+    let pool = &state.pool;
+
+    repo::find_by_id(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (get_use_case): {:?}", e);
@@ -39,11 +45,14 @@ pub async fn get_use_case(
 }
 
 pub async fn create_use_case(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(payload): Json<UseCasePayload>,
 ) -> Result<(StatusCode, Json<UseCaseCreateResponse>), StatusCode> {
+
+    let pool = &state.pool;
+
     let use_case = repo::insert(
-        &pool,
+        pool,
         payload.name,
         payload.prompt,
         payload.project_id,
@@ -58,12 +67,15 @@ pub async fn create_use_case(
 }
 
 pub async fn update_use_case(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<UseCasePayload>,
 ) -> Result<Json<UseCase>, StatusCode> {
+
+    let pool = &state.pool;
+
     repo::update(
-        &pool,
+        pool,
         id,
         payload.name,
         payload.prompt,
@@ -79,12 +91,13 @@ pub async fn update_use_case(
 }
 
 pub async fn delete_use_case(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
 
-    // 🔍 Verifica se existem tasks associadas
-    let has_tasks = task::exists_by_use_case_id(&pool, id)
+    let pool = &state.pool;
+
+    let has_tasks = task::exists_by_use_case_id(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (check_tasks): {:?}", e);
@@ -97,7 +110,6 @@ pub async fn delete_use_case(
             )
         })?;
 
-    // 🚫 Bloqueia deleção
     if has_tasks {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -108,8 +120,7 @@ pub async fn delete_use_case(
         ));
     }
 
-    // 🗑 Deleção normal
-    let deleted = repo::delete(&pool, id)
+    let deleted = repo::delete(pool, id)
         .await
         .map_err(|e| {
             println!("DB ERROR (delete_use_case): {:?}", e);

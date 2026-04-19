@@ -38,7 +38,6 @@ pub async fn insert(
     use_case_id: i32,
 ) -> Result<TaskCreateResponse, sqlx::Error> {
 
-    // 🔢 calcula próximo sequence
     let next_sequence: i32 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sequence), 0) + 1
          FROM task
@@ -113,7 +112,6 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
-/// 🔍 Verifica se existe alguma task ativa para um use_case
 pub async fn exists_by_use_case_id(
     pool: &PgPool,
     use_case_id: i32,

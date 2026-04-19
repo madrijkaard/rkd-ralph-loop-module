@@ -77,7 +77,6 @@ pub async fn delete(pool: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
-/// 🔍 Verifica se existe alguma iteration ativa para uma task
 pub async fn exists_by_task_id(
     pool: &PgPool,
     task_id: i32,
