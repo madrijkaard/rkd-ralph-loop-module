@@ -54,7 +54,7 @@ pub async fn create_use_case(
     let use_case = repo::insert(
         pool,
         payload.name,
-        payload.prompt,
+        payload.specification,
         payload.project_id,
     )
     .await
@@ -78,7 +78,7 @@ pub async fn update_use_case(
         pool,
         id,
         payload.name,
-        payload.prompt,
+        payload.specification,
         payload.project_id,
     )
     .await

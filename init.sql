@@ -9,7 +9,7 @@ CREATE TABLE project (
 CREATE TABLE use_case (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50),
-    prompt TEXT,
+    specification TEXT,
     created_date TIMESTAMP,
     last_modified_date TIMESTAMP,
     status VARCHAR(20),
@@ -22,7 +22,8 @@ CREATE TABLE task (
     sequence INTEGER,
     type VARCHAR(50),
     path TEXT,
-    prompt TEXT,
+    system_prompt TEXT,
+    user_prompt TEXT,
     created_date TIMESTAMP,
     last_modified_date TIMESTAMP,
     status VARCHAR(20),

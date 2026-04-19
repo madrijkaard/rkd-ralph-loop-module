@@ -13,7 +13,7 @@ pub struct Project {
 pub struct UseCase {
     pub id: i32,
     pub name: String,
-    pub prompt: String,
+    pub specification: String,
     pub created_date: NaiveDateTime,
     pub last_modified_date: NaiveDateTime,
     pub project_id: i32,
@@ -26,7 +26,8 @@ pub struct Task {
     pub sequence: i32,
     pub r#type: String,
     pub path: String,
-    pub prompt: String,
+    pub system_prompt: String,
+    pub user_prompt: String,
     pub created_date: NaiveDateTime,
     pub last_modified_date: NaiveDateTime,
     pub use_case_id: i32,

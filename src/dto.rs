@@ -9,7 +9,7 @@ pub struct ProjectPayload {
 #[derive(Deserialize)]
 pub struct UseCasePayload {
     pub name: String,
-    pub prompt: String,
+    pub specification: String,
     pub project_id: i32,
 }
 
@@ -18,7 +18,8 @@ pub struct TaskPayload {
     pub name: String,
     pub r#type: String,
     pub path: String,
-    pub prompt: String,
+    pub system_prompt: String,
+    pub user_prompt: String,
     pub use_case_id: i32,
 }
 
@@ -35,8 +36,6 @@ pub struct IterationPayload {
 
 #[derive(Deserialize)]
 pub struct ExecuteTaskPayload {
-    pub system_content: String,
-    pub user_content: String,
     pub model: String,
 }
 
@@ -74,7 +73,7 @@ pub struct ProjectCreateResponse {
 pub struct UseCaseCreateResponse {
     pub id: i32,
     pub name: String,
-    pub prompt: String,
+    pub specification: String,
     pub created_date: NaiveDateTime,
     pub project_id: i32,
 }
@@ -86,7 +85,8 @@ pub struct TaskCreateResponse {
     pub sequence: i32,
     pub r#type: String,
     pub path: String,
-    pub prompt: String,
+    pub system_prompt: String,
+    pub user_prompt: String,
     pub created_date: NaiveDateTime,
     pub use_case_id: i32,
 }

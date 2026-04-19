@@ -71,7 +71,8 @@ pub async fn create_task(
         payload.name,
         payload.r#type,
         payload.path,
-        payload.prompt,
+        payload.system_prompt,
+        payload.user_prompt,
         payload.use_case_id,
     )
     .await
@@ -113,7 +114,8 @@ pub async fn update_task(
         payload.name,
         payload.r#type,
         payload.path,
-        payload.prompt,
+        payload.system_prompt,
+        payload.user_prompt,
         payload.use_case_id,
     )
     .await
@@ -232,11 +234,11 @@ pub async fn execute_task(
     // 2. Criar client
     let engine = EngineClient::new(settings.engine_base_url.clone());
 
-    // 3. Executar engine
+    // 3. Executar engine usando prompts da task
     let content = engine
         .generate(
-            payload.system_content,
-            payload.user_content,
+            task.system_prompt.clone(),
+            task.user_prompt.clone(),
             payload.model,
         )
         .await
