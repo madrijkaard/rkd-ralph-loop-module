@@ -224,47 +224,70 @@ fn extract_code_safely(content: &str) -> String {
 
 /// Limpeza final do código extraído
 fn clean_final_code(mut code: String) -> String {
-    // Remove artefatos JSON do final: }", "}, }\n", etc.
-    while code.ends_with("}\"") || code.ends_with("\"}") || code.ends_with("}\n\"") || code.ends_with("}\r\n\"") {
-        if code.ends_with("}\r\n\"") {
-            code.pop(); // remove "
-            code.pop(); // remove \n
-            code.pop(); // remove \r
-            code.pop(); // remove }
-        } else if code.ends_with("}\n\"") {
-            code.pop(); // remove "
-            code.pop(); // remove \n
-            code.pop(); // remove }
-        } else if code.ends_with("}\"") {
-            code.pop(); // remove "
-            code.pop(); // remove }
-        } else if code.ends_with("\"}") {
-            code.pop(); // remove }
-            code.pop(); // remove "
+    eprintln!("=== CLEANING CODE ===");
+    eprintln!("Before cleaning - length: {}", code.len());
+    
+    // Mostra os últimos 100 caracteres para debug
+    let debug_len = code.len();
+    let start_idx = if debug_len > 100 { debug_len - 100 } else { 0 };
+    eprintln!("Last 100 chars before: \"{}\"", &code[start_idx..].escape_debug());
+    
+    // Estratégia: Encontrar a última ocorrência de "}\n}" ou "}\n\""
+    // e remover tudo depois disso
+    
+    // Primeiro, remove "}\"\n" ou "\"}\n" do final
+    let patterns = ["}\"\n", "\"}\n", "}\n\"\n", "}\n\"", "}\"\n\n"];
+    for pattern in &patterns {
+        while code.ends_with(pattern) {
+            for _ in 0..pattern.len() {
+                code.pop();
+            }
         }
     }
     
-    // Remove aspas duplas no final se existirem e não fizerem parte do código
-    while code.ends_with('"') {
-        let quote_count = code.matches('"').count();
-        let brace_count = code.matches('{').count();
-        // Só remove se houver mais aspas que chaves (indicando aspas extras do JSON)
-        if quote_count > brace_count * 2 {
-            code.pop();
-        } else {
-            break;
+    // Agora procura por "}\"\n}" ou padrões similares
+    if let Some(pos) = code.rfind("}\"\n}") {
+        code.truncate(pos + 1); // Mantém só até a primeira }
+        eprintln!("Found '}}\"\\n}}' pattern, truncated to first }}");
+    } else if let Some(pos) = code.rfind("\"}\n}") {
+        code.truncate(pos + 1);
+        eprintln!("Found '\"}}\\n}}' pattern, truncated");
+    } else if let Some(pos) = code.rfind("}\n\"\n}") {
+        code.truncate(pos + 1);
+        eprintln!("Found '}}\\n\"\\n}}' pattern, truncated");
+    }
+    
+    // Remove qualquer coisa depois da última chave válida
+    // A última chave válida é a que fecha a classe
+    if let Some(last_brace) = code.rfind("\n}") {
+        // Verifica se depois dessa chave só tem lixo
+        let after_brace = &code[last_brace + 2..];
+        if after_brace.contains('"') || after_brace.contains('\n') && after_brace.trim().is_empty() {
+            code.truncate(last_brace + 2); // +2 para incluir "\n}"
+            eprintln!("Truncated after last valid class closing brace");
         }
     }
     
-    // Remove quebras de linha e espaços extras no final
-    while code.ends_with('\n') || code.ends_with('\r') || code.ends_with(' ') {
+    // Remove aspas e quebras de linha extras no final
+    while code.ends_with('"') || code.ends_with('\n') || code.ends_with('\r') {
         code.pop();
     }
     
-    // Garante que o arquivo termina com uma quebra de linha
-    if !code.ends_with('\n') {
-        code.push('\n');
+    // Garante que termina com }\n
+    if !code.ends_with("}\n") {
+        if code.ends_with('}') {
+            code.push('\n');
+        } else {
+            // Se por algum motivo não terminar com }, adiciona
+            code.push_str("\n}\n");
+        }
     }
+    
+    eprintln!("After cleaning - length: {}", code.len());
+    let after_len = code.len();
+    let start_idx_after = if after_len > 100 { after_len - 100 } else { 0 };
+    eprintln!("Last 100 chars after: \"{}\"", &code[start_idx_after..].escape_debug());
+    eprintln!("=== END CLEANING ===");
     
     code
 }
