@@ -5,6 +5,7 @@ use axum::{
 };
 use std::fs;
 use std::path::Path as StdPath;
+use regex::Regex;
 
 use crate::api::AppState;
 use crate::dto::{
@@ -76,8 +77,8 @@ pub async fn create_task(
         ));
     }
 
-    // Valida se o path é seguro
-    if let Err(e) = validate_path(&payload.path) {
+    // Valida se o path é seguro (agora deve ser apenas diretório)
+    if let Err(e) = validate_directory_path(&payload.path) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
@@ -132,8 +133,8 @@ pub async fn update_task(
         ));
     }
 
-    // Valida se o path é seguro
-    if let Err(e) = validate_path(&payload.path) {
+    // Valida se o path é seguro (agora deve ser apenas diretório)
+    if let Err(e) = validate_directory_path(&payload.path) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
@@ -235,7 +236,7 @@ pub async fn delete_task(
 
 //
 // ==========================
-// EXECUTE TASK (COMPLETELY FIXED)
+// EXECUTE TASK (UPDATED FOR MULTIPLE FILES)
 // ==========================
 //
 
@@ -277,27 +278,26 @@ pub async fn execute_task(
     }
 
     // 3. Verifica se o diretório existe, se não, tenta criar
-    if let Some(parent) = StdPath::new(&task.path).parent() {
-        if !parent.exists() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                eprintln!("DIR ERROR: failed to create directory {}: {}", parent.display(), e);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse {
-                        code: "BR_0003".into(),
-                        message: format!("Não foi possível criar o diretório: {}", e),
-                    }),
-                ));
-            }
-            eprintln!("✅ Directory created: {}", parent.display());
+    let dir_path = StdPath::new(&task.path);
+    if !dir_path.exists() {
+        if let Err(e) = fs::create_dir_all(dir_path) {
+            eprintln!("DIR ERROR: failed to create directory {}: {}", dir_path.display(), e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0003".into(),
+                    message: format!("Não foi possível criar o diretório: {}", e),
+                }),
+            ));
         }
+        eprintln!("✅ Directory created: {}", dir_path.display());
     }
 
     // 4. Inicializa o engine client
     let engine = EngineClient::new(state.settings.engine_base_url.clone());
 
-    // 5. Gera o código via LLM
-    let generated_code = engine
+    // 5. Gera os códigos via LLM (agora retorna Vec<String>)
+    let generated_codes = engine
         .generate(
             task.system_prompt.clone(),
             task.user_prompt.clone(),
@@ -315,39 +315,76 @@ pub async fn execute_task(
             )
         })?;
 
-    // 6. LOG para debug (mostra os primeiros 200 caracteres do código gerado)
-    eprintln!("=== GENERATED CODE (first 200 chars) ===");
-    let preview: String = generated_code.chars().take(200).collect();
-    eprintln!("{}", preview);
-    if generated_code.len() > 200 {
-        eprintln!("... ({} more characters)", generated_code.len() - 200);
+    // 6. Verifica se algum código foi gerado
+    if generated_codes.is_empty() {
+        eprintln!("ERROR: No codes generated from LLM");
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                code: "BR_0006".into(),
+                message: "Nenhum código foi gerado pelo modelo.".into(),
+            }),
+        ));
     }
-    eprintln!("=========================================");
 
-    // 7. Escreve o arquivo baseado no tipo da task
+    eprintln!("=== GENERATED {} CODE(S) ===", generated_codes.len());
+
+    // 7. Processa baseado no tipo da task
     match task.r#type.as_str() {
         "JAVA" => {
-            // Garante que o arquivo tem extensão .java
-            let final_path = ensure_java_extension(&task.path);
+            let mut created_files = Vec::new();
             
-            fs::write(&final_path, &generated_code)
-                .map_err(|e| {
-                    eprintln!("FILE ERROR: failed to write {}: {}", final_path, e);
+            for (i, code) in generated_codes.iter().enumerate() {
+                // Extrai o nome da classe do código Java
+                let class_name = match extract_class_name_from_java(code) {
+                    Some(name) => name,
+                    None => {
+                        eprintln!("WARN: Could not extract class name from code {}, using default name 'Class{}'", i+1, i+1);
+                        format!("Class{}", i+1)
+                    }
+                };
+                
+                // Constrói o path completo do arquivo
+                let file_path = dir_path.join(format!("{}.java", class_name));
+                let file_path_str = file_path.to_str().ok_or_else(|| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(ErrorResponse {
                             code: "BR_0003".into(),
-                            message: format!("Erro ao escrever arquivo: {}", e),
+                            message: "Path inválido para o arquivo.".into(),
                         }),
                     )
                 })?;
+                
+                // Escreve o arquivo
+                fs::write(file_path_str, code)
+                    .map_err(|e| {
+                        eprintln!("FILE ERROR: failed to write {}: {}", file_path_str, e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(ErrorResponse {
+                                code: "BR_0003".into(),
+                                message: format!("Erro ao escrever arquivo {}: {}", class_name, e),
+                            }),
+                        )
+                    })?;
+                
+                eprintln!("✅ Java file written to: {}", file_path_str);
+                created_files.push(class_name);
+            }
             
-            eprintln!("✅ Java file written to: {}", final_path);
+            eprintln!("✅ Total Java files created: {}", created_files.len());
+            eprintln!("📁 Classes: {:?}", created_files);
         }
         "XML" => {
+            // Para XML, ainda esperamos apenas um arquivo
+            if generated_codes.len() > 1 {
+                eprintln!("WARN: Received {} codes for XML task, but only first will be used", generated_codes.len());
+            }
+            
             let final_path = ensure_xml_extension(&task.path);
             
-            fs::write(&final_path, &generated_code)
+            fs::write(&final_path, &generated_codes[0])
                 .map_err(|e| {
                     eprintln!("FILE ERROR: failed to write {}: {}", final_path, e);
                     (
@@ -362,9 +399,14 @@ pub async fn execute_task(
             eprintln!("✅ XML file written to: {}", final_path);
         }
         "SHELL_SCRIPT" => {
+            // Para Shell, ainda esperamos apenas um arquivo
+            if generated_codes.len() > 1 {
+                eprintln!("WARN: Received {} codes for Shell task, but only first will be used", generated_codes.len());
+            }
+            
             let final_path = ensure_sh_extension(&task.path);
             
-            fs::write(&final_path, &generated_code)
+            fs::write(&final_path, &generated_codes[0])
                 .map_err(|e| {
                     eprintln!("FILE ERROR: failed to write {}: {}", final_path, e);
                     (
@@ -412,8 +454,8 @@ pub async fn execute_task(
 // ==========================
 //
 
-/// Valida se o path é seguro para escrita
-fn validate_path(path: &str) -> Result<(), String> {
+/// Valida se o path é um diretório seguro para escrita
+fn validate_directory_path(path: &str) -> Result<(), String> {
     if path.is_empty() {
         return Err("Path não pode ser vazio".to_string());
     }
@@ -430,16 +472,42 @@ fn validate_path(path: &str) -> Result<(), String> {
         return Err("Path não pode conter '..'".to_string());
     }
     
+    // Verifica se parece um arquivo (tem extensão)
+    if let Some(extension) = path.extension() {
+        if extension == "java" || extension == "xml" || extension == "sh" {
+            return Err("Path deve ser um diretório, não deve conter nome de arquivo com extensão".to_string());
+        }
+    }
+    
     Ok(())
 }
 
-/// Garante que o arquivo tem extensão .java
-fn ensure_java_extension(path: &str) -> String {
-    if path.to_lowercase().ends_with(".java") {
-        path.to_string()
-    } else {
-        format!("{}.java", path)
+/// Extrai o nome da classe de um código Java
+fn extract_class_name_from_java(code: &str) -> Option<String> {
+    // Procura por padrões como: "public class NomeClasse", "class NomeClasse", "public interface NomeClasse"
+    let patterns = [
+        r"public\s+class\s+(\w+)",
+        r"class\s+(\w+)",
+        r"public\s+interface\s+(\w+)",
+        r"interface\s+(\w+)",
+        r"public\s+enum\s+(\w+)",
+        r"enum\s+(\w+)",
+    ];
+    
+    for pattern in patterns {
+        let re = Regex::new(pattern).unwrap();
+        if let Some(caps) = re.captures(code) {
+            if let Some(class_name) = caps.get(1) {
+                let name = class_name.as_str().to_string();
+                eprintln!("Extracted class name: {}", name);
+                return Some(name);
+            }
+        }
     }
+    
+    eprintln!("Failed to extract class name from Java code");
+    eprintln!("Code preview: {}", &code[..code.len().min(200)]);
+    None
 }
 
 /// Garante que o arquivo tem extensão .xml
