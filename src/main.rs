@@ -4,6 +4,7 @@ mod db;
 mod dto;
 mod enumerator;
 mod model;
+mod parser;
 mod repository;
 mod engine;
 
