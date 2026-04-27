@@ -8,22 +8,14 @@ use crate::api::AppState;
 use crate::engine::EngineClient;
 use crate::dto::ErrorResponse;
 
-//
-// ==========================
-// GET MODELS 🔥
-// ==========================
-//
-
 pub async fn get_models(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<String>>, (StatusCode, Json<ErrorResponse>)> {
 
     let settings = &state.settings;
 
-    // 1. Criar client do engine
     let engine = EngineClient::new(settings.engine_base_url.clone());
 
-    // 2. Buscar modelos
     let models = engine
         .list_models()
         .await
@@ -38,6 +30,5 @@ pub async fn get_models(
             )
         })?;
 
-    // 3. Retornar apenas lista de IDs
     Ok(Json(models))
 }

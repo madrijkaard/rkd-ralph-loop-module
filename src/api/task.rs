@@ -17,56 +17,69 @@ use crate::enumerator::TaskType;
 use crate::engine::EngineClient;
 use crate::parser::extract_codes;
 
-//
-// ==========================
-// GET TASKS BY USE CASE
-// ==========================
-//
-
 pub async fn get_tasks_by_use_case(
     State(state): State<AppState>,
     Path(use_case_id): Path<i32>,
-) -> Result<Json<Vec<Task>>, StatusCode> {
+) -> Result<Json<Vec<Task>>, (StatusCode, Json<ErrorResponse>)> {
+
     let tasks = repo::find_all_by_use_case_id(&state.pool, use_case_id)
         .await
         .map_err(|e| {
             eprintln!("DB ERROR (get_tasks_by_use_case): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?;
+
+    if tasks.is_empty() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Não existem tarefas cadastradas para este caso de uso.".into(),
+            }),
+        ));
+    }
 
     Ok(Json(tasks))
 }
 
-//
-// ==========================
-// GET TASK
-// ==========================
-//
-
 pub async fn get_task(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-) -> Result<Json<Task>, StatusCode> {
+) -> Result<Json<Task>, (StatusCode, Json<ErrorResponse>)> {
+
     repo::find_by_id(&state.pool, id)
         .await
         .map_err(|e| {
             eprintln!("DB ERROR (get_task): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?
         .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Tarefa não encontrada.".into(),
+            }),
+        ))
 }
-
-//
-// ==========================
-// CREATE TASK
-// ==========================
-//
 
 pub async fn create_task(
     State(state): State<AppState>,
     Json(payload): Json<TaskPayload>,
 ) -> Result<(StatusCode, Json<TaskCreateResponse>), (StatusCode, Json<ErrorResponse>)> {
+
     if !TaskType::is_valid(&payload.r#type) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -81,7 +94,7 @@ pub async fn create_task(
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
-                code: "BR_0004".into(),
+                code: "BR_0002".into(),
                 message: format!("Path inválido: {}", e),
             }),
         ));
@@ -103,7 +116,7 @@ pub async fn create_task(
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 code: "BR_0000".into(),
-                message: "Erro interno.".into(),
+                message: "Ocorreu um erro inesperado.".into(),
             }),
         )
     })?;
@@ -111,17 +124,12 @@ pub async fn create_task(
     Ok((StatusCode::CREATED, Json(task)))
 }
 
-//
-// ==========================
-// UPDATE TASK
-// ==========================
-//
-
 pub async fn update_task(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<TaskPayload>,
 ) -> Result<Json<Task>, (StatusCode, Json<ErrorResponse>)> {
+
     if !TaskType::is_valid(&payload.r#type) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -159,7 +167,7 @@ pub async fn update_task(
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 code: "BR_0000".into(),
-                message: "Erro interno.".into(),
+                message: "Ocorreu um erro inesperado.".into(),
             }),
         )
     })?
@@ -167,22 +175,17 @@ pub async fn update_task(
     .ok_or((
         StatusCode::NOT_FOUND,
         Json(ErrorResponse {
-            code: "BR_0002".into(),
+            code: "BR_0001".into(),
             message: "Tarefa não encontrada.".into(),
         }),
     ))
 }
 
-//
-// ==========================
-// DELETE TASK
-// ==========================
-//
-
 pub async fn delete_task(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<DeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
+
     let has_iterations = iteration::exists_by_task_id(&state.pool, id)
         .await
         .map_err(|e| {
@@ -191,7 +194,7 @@ pub async fn delete_task(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: "Erro interno.".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
                 }),
             )
         })?;
@@ -201,7 +204,7 @@ pub async fn delete_task(
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
                 code: "BR_0001".into(),
-                message: "Existe iteração associada à tarefa.".into(),
+                message: "Não foi possível excluir a tarefa, existe iteração associada.".into(),
             }),
         ));
     }
@@ -214,7 +217,7 @@ pub async fn delete_task(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: "Erro interno.".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
                 }),
             )
         })?;
@@ -225,24 +228,19 @@ pub async fn delete_task(
         Err((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
-                code: "BR_0002".into(),
+                code: "BR_0001".into(),
                 message: "Tarefa não encontrada.".into(),
             }),
         ))
     }
 }
 
-//
-// ==========================
-// EXECUTE TASK
-// ==========================
-//
-
 pub async fn execute_task(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<ExecuteTaskPayload>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+
     // 1. Busca a task no banco
     let task = repo::find_by_id(&state.pool, id)
         .await
@@ -252,46 +250,47 @@ pub async fn execute_task(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: "Erro interno.".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
                 }),
             )
         })?
         .ok_or((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
-                code: "BR_0002".into(),
+                code: "BR_0001".into(),
                 message: "Tarefa não encontrada.".into(),
             }),
         ))?;
 
-    // 2. Valida o path
-    if task.path.is_empty() {
+    // 2. Valida se o path está configurado
+    if task.path.trim().is_empty() {
         return Err((
-            StatusCode::BAD_REQUEST,
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
-                code: "BR_0004".into(),
-                message: "Path da tarefa não configurado.".into(),
+                code: "BR_0000".into(),
+                message: "O path da tarefa não foi definido.".into(),
             }),
         ));
     }
 
-    // 3. Garante que o diretório existe
+    // 3. Garante que o diretório existe, criando-o se necessário
     let dir_path = StdPath::new(&task.path);
+
     if !dir_path.exists() {
         fs::create_dir_all(dir_path).map_err(|e| {
             eprintln!("DIR ERROR: failed to create directory {}: {}", dir_path.display(), e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
-                    code: "BR_0003".into(),
-                    message: format!("Não foi possível criar o diretório: {}", e),
+                    code: "BR_0000".into(),
+                    message: "Não foi possível criar um path da tarefa.".into(),
                 }),
             )
         })?;
         eprintln!("✅ Directory created: {}", dir_path.display());
     }
 
-    // 4. Chama o engine — retorna o conteúdo bruto do LLM
+    // 4. Chama o engine (LLM)
     let engine = EngineClient::new(state.settings.engine_base_url.clone());
 
     let raw_content = engine
@@ -307,15 +306,14 @@ pub async fn execute_task(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: format!("Erro ao executar engine: {}", e),
+                    message: "Não foi possível gerar o código pela engine.".into(),
                 }),
             )
         })?;
 
-    // 5. Processa conforme o tipo da task
+    // 5. Processa o retorno do LLM de acordo com o task.type
     match task.r#type.as_str() {
         "JAVA" => {
-            // Extrai todas as classes Java usando o parser robusto
             let classes = extract_codes(&raw_content).map_err(|e| {
                 eprintln!("PARSER ERROR: {}", e);
                 (
@@ -332,7 +330,6 @@ pub async fn execute_task(
             let mut created_files: Vec<String> = Vec::new();
 
             for (i, class_code) in classes.iter().enumerate() {
-                // Extrai o nome da classe do próprio código
                 let class_name = extract_java_class_name(class_code)
                     .unwrap_or_else(|| {
                         eprintln!(
@@ -364,7 +361,6 @@ pub async fn execute_task(
         }
 
         "XML" => {
-            // Para XML usa serde_json simples — formato de saída é um único arquivo
             let code = extract_single_code(&raw_content).map_err(|e| {
                 eprintln!("PARSER ERROR (XML): {}", e);
                 (
@@ -417,7 +413,6 @@ pub async fn execute_task(
                 )
             })?;
 
-            // Torna o script executável em sistemas Unix
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -434,12 +429,12 @@ pub async fn execute_task(
         }
 
         _ => {
-            eprintln!("WARN: tipo de tarefa não suportado: {}", task.r#type);
+            eprintln!("WARN: tipo de tarefa não mapeado: {}", task.r#type);
             return Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
-                    code: "BR_0005".into(),
-                    message: format!("Tipo de tarefa não suportado: {}", task.r#type),
+                    code: "BR_0000".into(),
+                    message: "Tipo da tarefa não mapeado.".into(),
                 }),
             ));
         }
@@ -448,14 +443,8 @@ pub async fn execute_task(
     Ok(StatusCode::CREATED)
 }
 
-//
-// ==========================
-// HELPERS
-// ==========================
-//
-
-/// Valida se o path é um diretório absoluto seguro (sem extensão de arquivo).
 fn validate_directory_path(path: &str) -> Result<(), String> {
+
     if path.is_empty() {
         return Err("Path não pode ser vazio".to_string());
     }
@@ -483,9 +472,8 @@ fn validate_directory_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Extrai o nome da classe/interface/enum de um trecho de código Java.
 fn extract_java_class_name(code: &str) -> Option<String> {
-    // Patterns em ordem de prioridade
+
     let patterns = [
         "public class ",
         "public interface ",
@@ -513,19 +501,18 @@ fn extract_java_class_name(code: &str) -> Option<String> {
     None
 }
 
-/// Para XML e SHELL_SCRIPT: extrai o primeiro (e único esperado) elemento
-/// do array "code" usando serde_json, como fallback simples.
 fn extract_single_code(raw: &str) -> Result<String, String> {
+
     let sanitized = raw.trim().replace("\\'", "'");
 
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(&sanitized) {
-        // Tenta array primeiro
+
         if let Some(arr) = value.get("code").and_then(|v| v.as_array()) {
             if let Some(first) = arr.first().and_then(|v| v.as_str()) {
                 return Ok(first.to_string());
             }
         }
-        // Fallback: "code" como string simples
+
         if let Some(s) = value.get("code").and_then(|v| v.as_str()) {
             return Ok(s.to_string());
         }
@@ -534,8 +521,8 @@ fn extract_single_code(raw: &str) -> Result<String, String> {
     Err("Could not extract code from LLM output".to_string())
 }
 
-/// Garante que o path termina com a extensão esperada.
 fn ensure_extension(path: &str, ext: &str) -> String {
+
     if path.to_lowercase().ends_with(&format!(".{}", ext)) {
         path.to_string()
     } else {

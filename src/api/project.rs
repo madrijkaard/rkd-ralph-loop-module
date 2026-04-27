@@ -12,7 +12,7 @@ use crate::repository::use_case;
 
 pub async fn get_projects(
     State(state): State<AppState>,
-) -> Result<Json<Vec<Project>>, StatusCode> {
+) -> Result<Json<Vec<Project>>, (StatusCode, Json<ErrorResponse>)> {
 
     let pool = &state.pool;
 
@@ -20,8 +20,24 @@ pub async fn get_projects(
         .await
         .map_err(|e| {
             println!("DB ERROR (get_projects): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?;
+
+    if projects.is_empty() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Não existem projetos cadastrados.".into(),
+            }),
+        ));
+    }
 
     Ok(Json(projects))
 }
@@ -29,7 +45,7 @@ pub async fn get_projects(
 pub async fn get_project(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-) -> Result<Json<Project>, StatusCode> {
+) -> Result<Json<Project>, (StatusCode, Json<ErrorResponse>)> {
 
     let pool = &state.pool;
 
@@ -37,16 +53,28 @@ pub async fn get_project(
         .await
         .map_err(|e| {
             println!("DB ERROR (get_project): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?
         .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Projeto não encontrado.".into(),
+            }),
+        ))
 }
 
 pub async fn create_project(
     State(state): State<AppState>,
     Json(payload): Json<ProjectPayload>,
-) -> Result<(StatusCode, Json<ProjectCreateResponse>), StatusCode> {
+) -> Result<(StatusCode, Json<ProjectCreateResponse>), (StatusCode, Json<ErrorResponse>)> {
 
     let pool = &state.pool;
 
@@ -54,7 +82,13 @@ pub async fn create_project(
         .await
         .map_err(|e| {
             println!("DB ERROR (create_project): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?;
 
     Ok((StatusCode::CREATED, Json(project)))
@@ -64,7 +98,7 @@ pub async fn update_project(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<ProjectPayload>,
-) -> Result<Json<Project>, StatusCode> {
+) -> Result<Json<Project>, (StatusCode, Json<ErrorResponse>)> {
 
     let pool = &state.pool;
 
@@ -72,10 +106,22 @@ pub async fn update_project(
         .await
         .map_err(|e| {
             println!("DB ERROR (update_project): {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    code: "BR_0000".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
+                }),
+            )
         })?
         .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                code: "BR_0001".into(),
+                message: "Projeto não encontrado.".into(),
+            }),
+        ))
 }
 
 pub async fn delete_project(
@@ -93,7 +139,7 @@ pub async fn delete_project(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: "Erro interno.".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
                 }),
             )
         })?;
@@ -116,7 +162,7 @@ pub async fn delete_project(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
                     code: "BR_0000".into(),
-                    message: "Erro interno.".into(),
+                    message: "Ocorreu um erro inesperado.".into(),
                 }),
             )
         })?;
@@ -127,7 +173,7 @@ pub async fn delete_project(
         Err((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
-                code: "BR_0002".into(),
+                code: "BR_0001".into(),
                 message: "Projeto não encontrado.".into(),
             }),
         ))
